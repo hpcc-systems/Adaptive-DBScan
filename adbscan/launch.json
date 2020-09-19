@@ -1,0 +1,21 @@
+{
+    "name": "play-thor-submit",
+    "type": "ecl",
+    "request": "launch",
+    "mode": "submit",
+    "workspace": "${workspaceRoot}",
+    "program": "${file}",
+    "protocol": "https",
+    "serverAddress": "play.hpccsystems.com",
+    "port": 18010,
+    "rejectUnauthorized": false,
+    "targetCluster": "thor",
+    "eclccPath": "${config:ecl.eclccPath}",
+    "eclccArgs": [],
+    "includeFolders": "${config:ecl.includeFolders}",
+    "legacyMode": "${config:ecl.legacyMode}",
+    "resultLimit": 100,
+    "timeoutSecs": 60,
+    "user": "vscode_user",
+    "password": ""
+  }
