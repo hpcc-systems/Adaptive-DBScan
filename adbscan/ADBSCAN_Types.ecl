@@ -6,10 +6,10 @@ IMPORT ML_Core.Types as Types;
 
 /*
  * This module contains Type definitions required for the internal calculations performed
- * within the DBSCAN module.
+ * within the ADBSCAN module.
  */
 
-EXPORT DBSCAN_Types := MODULE
+EXPORT ADBSCAN_Types := MODULE
     /**
       * l_stage1 extends NumericField by adding a nodeID field and a fields field for the data
       * preparation of stage 2 local clustering.
@@ -32,7 +32,7 @@ EXPORT DBSCAN_Types := MODULE
         SET OF REAL4 fields;
     END;
     /**
-      * l_stage2 is the data strucuture for the local clustering of locDBSCAN() function.
+      * l_stage2 is the data strucuture for the local clustering of locADBSCAN() function.
       *
       * @field wi The work-item identifier for this cell.
       * @field id The record-identifier for this cell.
@@ -77,7 +77,7 @@ EXPORT DBSCAN_Types := MODULE
       * l_num_clusters
       *
       * This record structure holds the results of functions that return statistics
-      * about the clusters formed in DBSCAN clustering, that is, it is the result
+      * about the clusters formed in ADBSCAN clustering, that is, it is the result
       * structure for num_clusters and num_outliers.
       *
       * It contains the value of the statistic, per work-item

@@ -1,7 +1,7 @@
-/*##############################################################################
+﻿/*##############################################################################
 ## HPCC SYSTEMS software Copyright (C) 2019 HPCC Systems.  All rights reserved.
 ############################################################################## */
-IMPORT $.^.DBSCAN_Types AS Files;
+IMPORT $.^.ADBSCAN_Types AS Files;
 IMPORT ML_Core;
 IMPORT Std.system.Thorlib;
 

@@ -1,28 +1,30 @@
 ﻿/*##############################################################################
 ## HPCC SYSTEMS software Copyright (C) 2019 HPCC Systems.  All rights reserved.
 ############################################################################## */
-IMPORT $.^.DBSCAN_Types AS Files;
+IMPORT $.^.ADBSCAN_Types AS Files;
 IMPORT Std.system.Thorlib;
 
 EXPORT locCluster := MODULE
   /**
     * Return the partially clustered result of performing DBSCAN on points present only
-    * in one node. locDBSCAN takes as input a dataset distributed such that all points
+    * in one node. locADBSCAN takes as input a dataset distributed such that all points
     * are available in all nodes, but only whole set of points to form neighbors, resulting
-    * in 'local' and 'remote' neighbors. This partial DBSCAN clustering is returned, per node.
+    * in 'local' and 'remote' neighbors. This partial ADBSCAN clustering is returned, per node.
     *
-    * 
+    * One of the following distance functions may be used to compute distances between points:
+    * "euclidean","cosine","minkowski","manhattan","haversine","chebyshev"
     *
-    * 
+    * Of these, "minkowski" requires an additional parameter called p-value, that must be passed
+    * to the function when used
     *
     * @param dsIn          Distributed dataset for clustering in DATASET(l_stage2) format
-    * @param threshold     Lower of bound of the cluster densities
+    * @param threshold     minimum density
     * @param distance_func String naming the distance function to use
     * @param params        Set of additional parameters needed for distance functions
     * @param localNode     Parameter that indicates which node the code is running on
     */
-    EXPORT STREAMED DATASET(Files.l_stage3) locDBSCAN(STREAMED DATASET(Files.l_stage2) dsIn,
-													  REAL threshold,
+    EXPORT STREAMED DATASET(Files.l_stage3) locADBSCAN(STREAMED DATASET(Files.l_stage2) dsIn,
+																											REAL threshold,
                                                       STRING distance_func = 'euclidean',
                                                       SET OF REAL8 params = [],
                                                       UNSIGNED4 localNode = Thorlib.node()
@@ -116,6 +118,17 @@ EXPORT locCluster := MODULE
         return ans;
     }
     
+
+    // function: find returns the ultimate parent of the node in tree.
+    // input: node * data pointer
+    // output: pointer to parent of tree.
+    node* find(node *p){
+        if(p->parent == NULL || p->parent == p){
+            return p;
+        } else {
+            return find(p->parent);
+        }
+    }
     // function: Union merges the trees a and b based on disjoint sets
     // input : Two trees(a and b) to merge
     // output: void.
@@ -135,79 +148,85 @@ EXPORT locCluster := MODULE
     }
 		
 		
-	//function to get the neighbors of a point if it is a core point using gaussian kernel function 	
+		
     
     bool getNeighbors(vector<node*>ds,vector<float> landmark, vector<double> s2, uint32_t min_pts, vector<double>&kernels, double threshold){
 
-  	    uint32_t d = 0;
-        double s = 1.0;
-        for(uint32_t i = 0; i < s2.size(); i++)
-        {
-         s *= s2[i];
-        } 
-
-        double t = 0.9;
-        while( t >= threshold)
-        {    
-            for(uint32_t i = 0; i < kernels.size(); i++)
-            {
-                kernels[i] = 0;
-            }
-  	        for(uint64_t  i = 0; i < ds.size(); i++){
-  		    double a = 0.0;
-			if(ds[i]->isModified == true||ds[i]->isVisited == true)
-				continue;
-  		    for(uint64_t curr_var = 0; curr_var < ds[0]->fields.size(); curr_var++){	
+  	uint32_t d = 0;
+			double s = 1.0;
+		for(uint32_t i = 0; i < s2.size(); i++)
+				{
+					s *= s2[i];
+				}
+  	
 			
-			    a += pow((ds[i]->fields[curr_var] - landmark[curr_var]),2);
-  		    }
-			a = exp(-a/(2 * s)); //*(1/sqrt(s2 * 2 *3.14));
+				
+				double t = 0.9;
+		while(t >= threshold)
+		{
+		
+		for(uint32_t i = 0; i < kernels.size(); i++)
+				{
+					kernels[i] = 0;
+				}
+		
+			for(uint64_t  i = 0; i < ds.size(); i++){
+				double a = 0.0;
+				//if(ds[i]->isModified == true||ds[i]->isVisited == true)
+					//continue;
+				
+				for(uint64_t curr_var = 0; curr_var < ds[0]->fields.size(); curr_var++){	
+			
+					a += pow((ds[i]->fields[curr_var] - landmark[curr_var]),2);
+  		}
+					a = exp(-a/(2 * s)); 
 			
 			if(a >= t)
-			    kernels[i] = 1;
+			kernels[i] = 1;
 			else
-			    kernels[i] = 0;
+			kernels[i] = 0;
 
-            }  		
+		}  
+
+		
 		if(accumulate(kernels.begin(), kernels.end(), 0) >= (int)min_pts)
 		{
-		    return true;
+  	
+					return true;
 		}
-	
-
-        t = t - 0.05;
-    }
-    return false;
+		t = t - 0.05;
+		}
+	 return false;
 }
 
-    //function: dbscan returns a dataset with parentid's in each local node.
-    //input: Vector ds, threshold.
-    void dbscan(vector<node*> ds, double threshold) {
-		uint64_t minpts;
-		uint64_t d = ds[0]->fields.size();				
-		minpts = 0.1 * ds.size();
+    //function: adbscan returns a dataset with parentid's in each local node.
+    //input: Vector ds, distance eps and number of min points.
+    void adbscan(vector<node*> ds, double threshold) {
+				uint64_t minpts;
+				uint64_t d = ds[0]->fields.size();				
+				minpts = 0.1 * ds.size();
 				
-		uint32_t c  = 0;
+				uint32_t c  = 0;
 	
-	    vector<double> sum_x_map, sum_x2_map;
-	    for(uint64_t curr_var = 0;curr_var < ds[0]->fields.size(); curr_var++)
+	vector<double> sum_x_map, sum_x2_map;
+	for(uint64_t curr_var = 0;curr_var < ds[0]->fields.size(); curr_var++)
 		{
-			sum_x_map.push_back(0.0);
-			sum_x2_map.push_back(0.0);
+					sum_x_map.push_back(0.0);
+					sum_x2_map.push_back(0.0);
 					
-			for(uint64_t i = 0; i < ds.size(); i++){
+					for(uint64_t i = 0; i < ds.size(); i++){
 							
-				sum_x_map[curr_var] += ds[i]->fields[curr_var];
-				sum_x2_map[curr_var] += ds[i]->fields[curr_var] * ds[i]->fields[curr_var];			
+							sum_x_map[curr_var] += ds[i]->fields[curr_var];
+							sum_x2_map[curr_var] += ds[i]->fields[curr_var] * ds[i]->fields[curr_var];			
 			}		
-		}   
+		}
 		
 		vector<double> s2(d,0);
 		for(uint64_t curr_var = 0; curr_var < ds[0]->fields.size(); curr_var++)
-	    {
-		    double x  = sum_x_map[curr_var]/ds.size();
-  	        double x2 = sum_x2_map[curr_var];
-  	        s2[curr_var] = x2/ds.size() - (x*x);
+	{
+		double x  = sum_x_map[curr_var]/ds.size();
+  	double x2 = sum_x2_map[curr_var];
+  	 s2[curr_var] = x2/ds.size() - (x*x);
 		}
 		
 	
@@ -216,39 +235,39 @@ EXPORT locCluster := MODULE
 
             if(!ds[i]->ifLocal) continue;
 						
-			vector<double> kernels(ds.size(),0);
-			bool temp  =  getNeighbors(ds,ds[i]->fields,s2,minpts,kernels,threshold);
+						vector<double> kernels(ds.size(),0);
+						bool t = getNeighbors(ds,ds[i]->fields,s2,minpts,kernels,threshold);
 						
 						
-			if(!temp)
-			{
-				ds[i]->isModified = true;
+						if(!t)
+						{
+							ds[i]->isModified = true;
 
-				continue;
-			}
+							continue;
+						}
 
 						
-			vector<node*> neighs;
+					vector<node*> neighs;
 					
-			for(uint32_t j = 0;j < kernels.size();j++)
-			{
-				if(kernels[j] == 1)
-				{
-					if(i == j)
-						continue;
-					neighs.push_back(ds[j]);
-				}
-			}
+					for(uint32_t j = 0;j < kernels.size();j++)
+					{
+							if(kernels[j] == 1)
+							{
+							if(i == j)
+							continue;
+							neighs.push_back(ds[j]);
+							}
+					}
         
-			ds[i]->isModified = true;
+						   ds[i]->isModified = true;
 
-            ds[i]->ifCore = true;
-            ds[i]->parent = NULL;
-            for(uint64_t n=0; n < neighs.size(); ++n){
-                neighs[n]->isModified = true;
-                if(neighs[n]->ifLocal){
-                    if(neighs[n]->ifCore){
-                        Union(ds,ds[i],neighs[n]);
+                ds[i]->ifCore = true;
+                ds[i]->parent = NULL;
+                for(uint64_t n=0; n < neighs.size(); ++n){
+                    neighs[n]->isModified = true;
+                    if(neighs[n]->ifLocal){
+                        if(neighs[n]->ifCore){
+                            Union(ds,ds[i],neighs[n]);
                         } else {
                             if(neighs[n]->isVisited) continue;
                             neighs[n]->isVisited = true;
@@ -257,7 +276,7 @@ EXPORT locCluster := MODULE
                     } else {
                         if(!neighs[n]->ifCore){
 												
-							vector<double> k;
+															vector<double> k;
 															
                             if(getNeighbors(ds,neighs[n]->fields,s2,minpts,kernels,threshold)){
                                 neighs[n]->ifCore = true;
@@ -319,7 +338,7 @@ EXPORT locCluster := MODULE
                 results.push_back(&dataset[i]);
             }
 
-            dbscan(results,threshold);
+            adbscan(results,threshold);
         }
 
         //Returning  row by row via Interface
@@ -373,6 +392,6 @@ EXPORT locCluster := MODULE
     transform(distanceFunc.begin(),distanceFunc.end(),distanceFunc.begin(),::tolower);
 
     return new ResultStream(_resultAllocator, dsin,threshold,localnode);
-  ENDEMBED;//end locDBSCAN
+  ENDEMBED;//end locADBSCAN
 
 END;

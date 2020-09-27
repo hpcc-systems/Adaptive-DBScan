@@ -3,13 +3,13 @@
 ############################################################################## */
 IMPORT ML_Core;
 IMPORT ML_Core.Types AS Types;
-IMPORT $.DBSCAN_Types AS Files;
+IMPORT $.ADBSCAN_Types AS Files;
 IMPORT Std.system.Thorlib;
 IMPORT $.internal.locCluster;
 IMPORT $.internal.globalMerge;
 
 /**
-  * Scalable Parallel DBSCAN Clustering Algorithm Implementation based on [1].
+  * Scalable Parallel ADBSCAN Clustering Algorithm Implementation based on [1].
   * It's an extension of the original DBSCAN algorithm [2] to meet the challenge
   * of clustering problems on the Big Data platforms such as HPCC Systems.
   *
@@ -35,11 +35,11 @@ IMPORT $.internal.globalMerge;
   * @param dist_params a set of parameters for distance metrics that need exta setup.
   *                    Default value is [] which should fit for most cases.
   */
-EXPORT DBSCAN(Real thre = 0.1,STRING dist = 'euclidian',
+EXPORT ADBSCAN(Real thre = 0.1,STRING dist = 'euclidian',
                           SET OF REAL8 dist_params = []):= MODULE
 
   /**
-  * Fit function performs DBSCAN clustering on a dataset (ds) to find clusters and the cluster
+  * Fit function performs ADBSCAN clustering on a dataset (ds) to find clusters and the cluster
   * index (Label) of each sample in the dataset.
   *
   * @param ds  The dataset in NumericField format to be clustered.
@@ -78,7 +78,7 @@ EXPORT DBSCAN(Real thre = 0.1,STRING dist = 'euclidian',
     X := DISTRIBUTE(X3, ALL);
 
     //Stage 2: local clustering on each node
-    rds := locCluster.locDBSCAN(X, thre, distance_func := dist, params := dist_params);
+    rds := locCluster.locADBSCAN(X, thre, distance_func := dist, params := dist_params);
 
     //Stage 3: global merge the local clustering results to the final clustering result
     clusters := globalMerge.Merge(rds);
@@ -90,11 +90,11 @@ EXPORT DBSCAN(Real thre = 0.1,STRING dist = 'euclidian',
     * Num_Clusters
     *
     * Provides the number of clusters that the given dataset will be divided into
-    * when clustered by the DBSCAN algorithm.
+    * when clustered by the ADBSCAN algorithm.
     *
     * @param ds A dataset with cluster index information. Usually it's the result of Fit function.
     * @return DATASET(l_num_clusters) The number of clusters, per work item.
-    * @see DBSCAN_Types.l_num_clusters
+    * @see ADBSCAN_Types.l_num_clusters
     */
   EXPORT DATASET(Files.l_num_clusters) Num_Clusters(DATASET(ML_Core.Types.ClusterLabels) ds) := FUNCTION
     //Find maxmimum label of X samples per work item
@@ -109,11 +109,11 @@ EXPORT DBSCAN(Real thre = 0.1,STRING dist = 'euclidian',
     * Num_Outliers
     *
     * Provides the number of outliers that the given dataset will have
-    * when clustered by the DBSCAN algorithm.
+    * when clustered by the ADBSCAN algorithm.
     *
     * @param ds A dataset with cluster index information. Usually it's the result of Fit function.
     * @return DATASET(l_num_clusters) The number of outliers, per work item.
-    * @see DBSCAN_Types.l_num_clusters
+    * @see ADBSCAN_Types.l_num_clusters
     */
   EXPORT DATASET(Files.l_num_clusters) Num_Outliers(DATASET(ML_Core.Types.ClusterLabels) ds) := FUNCTION
     //Find number of outliers per work item
@@ -125,4 +125,4 @@ EXPORT DBSCAN(Real thre = 0.1,STRING dist = 'euclidian',
     RETURN result;
   END;//end Num_Outliers()
 
-END;//end DBSCAN
+END;//end ADBSCAN

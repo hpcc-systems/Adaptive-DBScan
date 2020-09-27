@@ -1,19 +1,16 @@
 ﻿IMPORT ML_Core;
 IMPORT ML_Core.Analysis;
 IMPORT ML_Core.Types AS Types;
-IMPORT DBSCAN AS DBSCAN;
-IMPORT $.datasets.adap AS compound_data;
-IMPORT $.datasets;
+IMPORT $ AS ADBSCAN;
+IMPORT $.tests.datasets.adap AS compound_data;
+IMPORT $.tests.datasets;
 
-rs :={Types.t_FieldReal x, Types.t_FieldReal y};
-rs1 :={Real x};
-actual := $.datasets.adap_actual;//labelled datset to check accuracy using ARI
-dim := 2;// dimension of the dataset
-Records := compound_data.ds;
 layout := compound_data.layout;
 
+EXPORT GridSearch := MODULE
 
-//function to standardize the dtatset
+EXPORT stand(DATASET(layout) Records,UNSIGNED4 dimension) := FUNCTION
+
 STREAMED DATASET(layout) standardize( STREAMED DATASET(layout) dsIn,UNSIGNED4 num) := EMBED(C++: activity) 
 		#include<iostream>
     #include<bits/stdc++.h>
@@ -149,72 +146,43 @@ STREAMED DATASET(layout) standardize( STREAMED DATASET(layout) dsIn,UNSIGNED4 nu
 
 ENDEMBED;
 
+ds := standardize(Records, dimension);
 
-ds := standardize(Records, dim);
+return ds;
+
+END;
+
+EXPORT Adaptive_Clustering(DATASET(LAYOUT) ds) := FUNCTION
 
 
+
+rs :={Types.t_FieldReal x, Types.t_FieldReal y};
+rs1 :={Real x};
 
 ML_Core.AppendSeqID(ds,id,dsID);
 ML_Core.ToField(dsID,dsNF);
 
-//possible values for threshold
 poss := dataset([{0.1},{0.15},{0.2},{0.25},{0.30},{0.35},{0.4},{0.45},{0.5},{0.55},{0.6},{0.65},{0.7},{0.75},{0.8},{0.85},{0.9},{0.95}] ,rs1);
 
 
-rs1 T1(RS1 L,integer c) := TRANSFORM
-mod := DBSCAN.DBSCAN(l.x).Fit(dsNF);
+
+rs T1(RS1 L,integer c) := TRANSFORM
+mod := ADBSCAN.ADBSCAN(l.x).Fit(dsNF);
 test := Analysis.Clustering.SampleSilhouetteScore(dsNF,mod);
 num := max(mod,mod.label);
 self.x := if(num > 1, ave(test,value), 0);
+self.y := c;
 END;
 
-//list of silhouette scores for various thresholds
+
 Silhouettes := project(poss,T1(LEFT,counter));
 
-//function to find the largest Silhouette score
-unsigned find( STREAMED DATASET(rs1) ds) := EMBED(C++)
-
-    #include<iostream>
-    #include<bits/stdc++.h>
-
-    using namespace std;
-		#body
-		vector<double> scores;
-		for(;;)
-		{
-			const byte *next = (const byte *)ds->nextRow();
-			if(!next)
-      break;
-			const byte *p = next;
-			
-       double f = *((double*)p); p += sizeof(double);
-			 p += sizeof(double);
-			 
-			 scores.push_back(f);
-       
-			 rtlReleaseRow(next);	
-			
-				}
-				
-				uint32_t maxElementIndex = max_element(scores.begin(),scores.end()) - scores.begin();
-
-		return maxElementIndex + 1;
-endembed;
-
-ind := find(Silhouettes);
+maximum := max(Silhouettes, Silhouettes.x);
+ind := Silhouettes(x = maximum)[1].y;
 thre := poss[ind].x ;
 
+mod := ADBSCAN.ADBSCAN(thre).Fit(dsNF);
 
-mod := DBSCAN.DBSCAN(thre).Fit(dsNF);
-
-
-NumberOfClusters := DBSCAN.DBSCAN().Num_Clusters(mod);
-NumberOfOutliers := DBSCAN.DBSCAN().Num_Outliers(mod);
-test := Analysis.Clustering.SilhouetteScore(dsNF,mod);
-test1 := Analysis.Clustering.ARI(mod, actual);
-
-OUTPUT(NumberOfClusters, NAMED('NumberOfClusters'));
-OUTPUT(NumberOfOutliers, NAMED('NumberOfOutliers'));
-output(test, NAMED('Silhouette'));
-output(test1, , NAMED('ARI'));
-
+return mod;
+END;
+END;
