@@ -1,2 +1,2 @@
-# DBSCAN
-DBSCAN Clustering Method
+# ADBSCAN
+ADBSCAN Clustering Method

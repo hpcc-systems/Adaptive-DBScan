@@ -149,7 +149,7 @@ EXPORT locCluster := MODULE
 		
 		
 		
-    
+    //function to get the neighbors of a point ,if it is a core point using gaussian kernel function
     bool getNeighbors(vector<node*>ds,vector<float> landmark, vector<double> s2, uint32_t min_pts, vector<double>&kernels, double threshold){
 
   	uint32_t d = 0;
