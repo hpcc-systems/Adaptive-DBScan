@@ -40,7 +40,10 @@ STREAMED DATASET(Types.NumericField) standardize( STREAMED DATASET(Types.Numeric
 		
 		void deviation(vector<rec > ds, double dev[], uint32_t dim)
 		{
-				double sum[dim+1] = {0.0},mean[dim +1] = {0.0},std[dim+1] = {0.0};
+				double sum[dim+1] ,mean[dim +1] ,std[dim+1] ;
+				memset(sum, 0, sizeof(double) * (dim + 1));
+				memset(mean, 0, sizeof(double) * (dim + 1));
+				memset(std, 0, sizeof(double) * (dim + 1));
 				for(uint32_t i = 0; i < ds.size(); i++)
 				{
 							sum[ds[i].no] += ds[i].val;
